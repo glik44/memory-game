@@ -1,5 +1,9 @@
 package com.afeka.tomergliksman.memoryGame;
 
+import android.app.AlertDialog;
+import android.app.Dialog;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Point;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
@@ -7,6 +11,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -37,11 +42,13 @@ public class GameActivity extends AppCompatActivity {
     private Button[][] buttons;
     private int difficult;
     private String playerName;
+    private String birthday;
     private int rows;
     private int cols;
     private boolean isFirst;
     private Button firstPress;
     private int numOfPairs;
+    private AlertDialog dialog;
 
 
     @Override
@@ -53,6 +60,7 @@ public class GameActivity extends AppCompatActivity {
         Bundle extras = getIntent().getExtras();
         this.playerName = extras.getString("name");
         this.difficult = extras.getInt("difficult");
+        this.birthday = extras.getString("birthday");
 
         this.gameGrid = (GridLayout) findViewById(R.id.grid);
         setName();
@@ -74,7 +82,7 @@ public class GameActivity extends AppCompatActivity {
         gameGrid.setColumnCount(cols);
         gameGrid.setRowCount(rows);
 
-        this.gameBord = new Bord(rows,cols);
+        this.gameBord = new Bord(rows, cols);
         this.buttons = new Button[rows][cols];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -95,6 +103,8 @@ public class GameActivity extends AppCompatActivity {
                         } else {
                             if (currentCard.equals(firstPress.getTag())) {
                                 numOfPairs--;
+                                if (numOfPairs == 0)
+                                    gameEndDialog("win");
                             } else {
                                 currentCard.setShow(false);
                                 ((Card) firstPress.getTag()).setShow(false);
@@ -110,6 +120,7 @@ public class GameActivity extends AppCompatActivity {
                                 drawBord();
                             }
                         }, 1000);
+
                     }
                 });
                 gameGrid.addView(buttons[i][j]);
@@ -143,7 +154,8 @@ public class GameActivity extends AppCompatActivity {
                 this.rows = MEDIUM_ROWS;
                 this.cols = MEDIUM_COLS;
                 this.timer = MEDIUM_TIMER;
-                level = "Medium";;
+                level = "Medium";
+                ;
                 break;
             case 3:
                 this.rows = HARD_ROWS;
@@ -152,7 +164,7 @@ public class GameActivity extends AppCompatActivity {
                 level = "Hard";
                 break;
         }
-        this.numOfPairs = (rows*cols)/2;
+        this.numOfPairs = (rows * cols) / 2;
         ((TextView) findViewById(R.id.difficult)).setText("" + level);
     }
 
@@ -166,8 +178,7 @@ public class GameActivity extends AppCompatActivity {
                     timer--;
                     startTimer();
                 } else {
-//                    gameManager.endGame();
-//                    createEndOfGameActivity();
+                    gameEndDialog("lose");
                 }
             }
         }, 1000);
@@ -176,6 +187,43 @@ public class GameActivity extends AppCompatActivity {
 
     private void tick(int seconds) {
         ((TextView) findViewById(R.id.timer)).setText("" + seconds);
+    }
 
+    public void gameEndDialog(String winOrLose){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Game End")
+        .setMessage("You " + winOrLose+"!\nPlay again?")
+        .setPositiveButton("Yes",  new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                restartGame();
+            }
+        })
+        .setNegativeButton("No", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                endGame();
+            }
+        });
+        this.dialog = builder.show();
+    }
+
+    private void endGame(){
+        Intent intent = new Intent(this, MainActivity.class);
+        startActivity(intent);
+    }
+
+    private void restartGame(){
+        Intent intent = new Intent(this, DifficultActivity.class);
+        intent.putExtra("name", playerName);
+        intent.putExtra("birthday", birthday);
+        startActivity(intent);;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if(dialog != null){
+            dialog.dismiss();
+        }
     }
 }
+

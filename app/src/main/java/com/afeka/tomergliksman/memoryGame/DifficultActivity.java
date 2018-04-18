@@ -75,6 +75,7 @@ public class DifficultActivity extends AppCompatActivity {
         Intent intent = new Intent(this, GameActivity.class);
         intent.putExtra("name", this.name);
         intent.putExtra("difficult", difficult);
+        intent.putExtra("birthday", date);
         intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
         startActivity(intent);
 
