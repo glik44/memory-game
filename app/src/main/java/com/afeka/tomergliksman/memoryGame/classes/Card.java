@@ -25,6 +25,10 @@ public class Card {
         this.isShow = show;
     }
 
+    public boolean isShow(){
+        return isShow;
+    }
+
     @Override
     public boolean equals(Object obj) {
         return ((Card)obj).id == this.id;

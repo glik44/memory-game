@@ -1,25 +1,38 @@
 package com.afeka.tomergliksman.memoryGame;
 
 import android.app.AlertDialog;
-import android.app.Dialog;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.graphics.Point;
 import android.os.Handler;
+import android.os.IBinder;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.afeka.tomergliksman.memoryGame.Services.PlayerLocation;
+import com.afeka.tomergliksman.memoryGame.Services.RotationService;
 import com.afeka.tomergliksman.memoryGame.classes.Bord;
 import com.afeka.tomergliksman.memoryGame.classes.Card;
+import com.afeka.tomergliksman.memoryGame.classes.Score;
 
-import static java.lang.Thread.sleep;
+import tyrantgit.explosionfield.ExplosionField;
+
+import static com.afeka.tomergliksman.memoryGame.Strings.NAME;
+import static com.afeka.tomergliksman.memoryGame.Strings.BIRTHDAY;
+import static com.afeka.tomergliksman.memoryGame.Strings.DIFFICULT;
+
 
 public class GameActivity extends AppCompatActivity {
 
@@ -46,9 +59,15 @@ public class GameActivity extends AppCompatActivity {
     private int rows;
     private int cols;
     private boolean isFirst;
+    private boolean playerWin;
     private Button firstPress;
     private int numOfPairs;
     private AlertDialog dialog;
+    Handler timerHandler = new Handler();
+    public RotationService.SensorServiceBinder binder;
+    private boolean isServiceBound = false;
+    private PlayerLocation playerLocation;
+    ExplosionField explosionField;
 
 
     @Override
@@ -56,19 +75,40 @@ public class GameActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_game);
         setTitle("Play!");
-
         Bundle extras = getIntent().getExtras();
-        this.playerName = extras.getString("name");
-        this.difficult = extras.getInt("difficult");
-        this.birthday = extras.getString("birthday");
-
+        this.playerName = extras.getString(NAME);
+        this.difficult = extras.getInt(DIFFICULT);
+        this.birthday = extras.getString(BIRTHDAY);
+        playerWin = false;
         this.gameGrid = (GridLayout) findViewById(R.id.grid);
         setName();
         setLevel();
         this.isFirst = true;
         createBord();
+        playerLocation = new PlayerLocation(this);
+    }
+
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        bindService(new Intent(this, RotationService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, new IntentFilter(RotationService.SENSOR_SERVICE_BROADCAST_ACTION));
         startTimer();
     }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if(dialog != null){
+            dialog.dismiss();
+        }
+        unbindService(serviceConnection);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver);
+        timerHandler.removeCallbacksAndMessages(null);
+        playerLocation.removeUpdates();
+    }
+
 
     private void createBord() {
         Point size = new Point();
@@ -100,27 +140,31 @@ public class GameActivity extends AppCompatActivity {
                         if (isFirst) {
                             firstPress = (Button) view;
                             isFirst = false;
-                        } else {
+                        }
+                        else {
+                            setEnableAll(false);
                             if (currentCard.equals(firstPress.getTag())) {
                                 numOfPairs--;
-                                if (numOfPairs == 0)
-                                    gameEndDialog("win");
-                            } else {
+                                if (numOfPairs == 0) {
+                                    playerWin = true;
+                                    endGame("win", timer);
+                                }
+                            }
+                            else {
                                 currentCard.setShow(false);
                                 ((Card) firstPress.getTag()).setShow(false);
                                 view.setEnabled(true);
                                 firstPress.setEnabled(true);
                             }
                             isFirst = true;
+                            new Handler().postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    drawBord();
+                                    setEnableAll(true);
+                                }
+                            }, 600);
                         }
-                        Handler handler = new Handler();
-                        handler.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                drawBord();
-                            }
-                        }, 1000);
-
                     }
                 });
                 gameGrid.addView(buttons[i][j]);
@@ -136,6 +180,22 @@ public class GameActivity extends AppCompatActivity {
         }
     }
 
+    private void drawBord(int image) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                this.buttons[i][j].setBackgroundResource(image);
+            }
+        }
+    }
+
+    public void setEnableAll(boolean enabledValue) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                if(!((Card)this.buttons[i][j].getTag()).isShow())
+                    this.buttons[i][j].setEnabled(enabledValue);
+            }
+        }
+    }
     private void setName() {
         ((TextView) findViewById(R.id.name)).setText("" + this.playerName);
     }
@@ -169,8 +229,7 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private void startTimer() {
-        Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
+        timerHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 tick(timer);
@@ -178,7 +237,8 @@ public class GameActivity extends AppCompatActivity {
                     timer--;
                     startTimer();
                 } else {
-                    gameEndDialog("lose");
+                    if(!playerWin)
+                        endGame("lose", timer);
                 }
             }
         }, 1000);
@@ -200,30 +260,94 @@ public class GameActivity extends AppCompatActivity {
         })
         .setNegativeButton("No", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                endGame();
+                exitGame();
             }
         });
         this.dialog = builder.show();
     }
 
-    private void endGame(){
+    private void exitGame(){
         Intent intent = new Intent(this, MainActivity.class);
         startActivity(intent);
     }
 
     private void restartGame(){
         Intent intent = new Intent(this, DifficultActivity.class);
-        intent.putExtra("name", playerName);
-        intent.putExtra("birthday", birthday);
+        intent.putExtra(NAME, playerName);
+        intent.putExtra(BIRTHDAY, birthday);
         startActivity(intent);;
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        if(dialog != null){
-            dialog.dismiss();
+    private void handleRotation(boolean enable) {
+        if (!enable) {
+            drawBord(R.drawable.question_mark);
+            setEnableAll(false);
+        }
+
+        if (enable) {
+            drawBord();
+            setEnableAll(true);
         }
     }
+
+    public void endGame(String winOrLose ,int time) {
+        if (winOrLose.equals("win")) {
+            Score newScore = new Score(calculateScore(time), this.difficult, this.playerName );
+            newScore.setPlayerLocation(playerLocation.getCurrentLocation());
+            MainActivity.scoreTable.updateScoreTable(newScore);
+            MainActivity.scoreTable.saveTableToMemory();
+            gameEndDialog(winOrLose);
+        }
+        else {
+            explosionField = ExplosionField.attach2Window(this);
+            explosionField.explode(gameGrid);
+            gameEndDialog(winOrLose);
+        }
+    }
+
+    private int calculateScore(int timeLeft) {
+        switch (this.difficult) {
+            case 1:
+                return timeLeft*100;
+            case 2:
+                return timeLeft*200;
+            case 3:
+                return timeLeft*400;
+        }
+        return 0;
+    }
+
+    private ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder service) {
+
+            binder = (RotationService.SensorServiceBinder) service;
+            isServiceBound = true;
+            notifyBoundService(RotationService.SensorServiceBinder.START_LISTENING);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            isServiceBound = false;
+
+        }
+
+        void notifyBoundService(String massageFromActivity) {
+            if (isServiceBound && binder != null) {
+                binder.notifyService(massageFromActivity);
+            }
+        }
+    };
+
+    // Handling the received Intents for the "my-integer" event
+    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            //          // Extract data included in the Intent
+            boolean state = intent.getBooleanExtra(RotationService.SENSOR_SERVICE_VALUES_KEY, true);
+            Log.d("on recive from srervice", "onReceive: " + state);
+            handleRotation(state);
+        }
+    };
 }
 

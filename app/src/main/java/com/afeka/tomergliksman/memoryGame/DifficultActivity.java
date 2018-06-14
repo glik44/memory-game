@@ -13,7 +13,13 @@ import java.time.Period;
 import java.util.Calendar;
 import java.util.Locale;
 
+import static com.afeka.tomergliksman.memoryGame.Strings.NAME;
+import static com.afeka.tomergliksman.memoryGame.Strings.BIRTHDAY;
+import static com.afeka.tomergliksman.memoryGame.Strings.DIFFICULT;
+
 public class DifficultActivity extends AppCompatActivity {
+
+
 
     private String name;
     private String date;
@@ -24,8 +30,8 @@ public class DifficultActivity extends AppCompatActivity {
         setTitle("Choose Level");
 
         Bundle extras = getIntent().getExtras();
-        this.name = extras.getString("name");
-        this.date = extras.getString("birthday");
+        this.name = extras.getString(NAME);
+        this.date = extras.getString(BIRTHDAY);
 
         TextView my_name = findViewById(R.id.my_name);
         my_name.setText("Name: "+this.name);
@@ -73,9 +79,9 @@ public class DifficultActivity extends AppCompatActivity {
         }
 
         Intent intent = new Intent(this, GameActivity.class);
-        intent.putExtra("name", this.name);
-        intent.putExtra("difficult", difficult);
-        intent.putExtra("birthday", date);
+        intent.putExtra(NAME, this.name);
+        intent.putExtra(DIFFICULT, difficult);
+        intent.putExtra(BIRTHDAY, date);
         intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
         startActivity(intent);
 

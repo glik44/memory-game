@@ -25,4 +25,11 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.1'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
+    implementation 'tyrantgit:explosionfield:1.0.1'
+    implementation 'com.android.support:support-compat:26.1.0'
+    implementation 'com.daimajia.easing:library:2.0@aar'
+    implementation 'com.daimajia.androidanimations:library:2.3@aar'
+    implementation 'com.google.code.gson:gson:2.8.0'
+    implementation 'com.google.android.gms:play-services-maps:8.3.0'
+
 }
